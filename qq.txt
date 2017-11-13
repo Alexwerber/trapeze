@@ -1,0 +1,378 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <GL/glut.h>
+
+int lineWidth;     // Размер рамки
+float color[3];    // Цвет заливки / рамки
+float array[2][8]; // Массив точек трапеции / трапеций
+
+void Reshape(int width, int height)
+{
+  glViewport(0, 0, width, height);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluOrtho2D(-1, 1, -1, 1);
+  glMatrixMode(GL_MODELVIEW);
+}
+
+void drawFrame(void)    // Рисование рамки
+{
+   glClear(GL_COLOR_BUFFER_BIT);
+ 
+   glColor3f(color[0], color[1], color[2]);
+   glLineWidth(lineWidth);
+ 
+     glBegin(GL_LINE_LOOP);
+        glVertex2f(array[0][0], array[0][1]);  
+        glVertex2f(array[1][0], array[1][1]);
+        glVertex2f(array[2][0], array[2][1]);
+        glVertex2f(array[3][0], array[3][1]);
+     glEnd();
+ 
+   glFlush();  
+}
+
+void drawArea(void)   // Рисование закрашенной фигуры
+{
+   glClear(GL_COLOR_BUFFER_BIT);
+ 
+   glColor3f(color[0], color[1], color[2]);
+   glLineWidth(lineWidth);
+ 
+     glBegin(GL_QUADS);
+        glVertex2f(array[0][0], array[0][1]);  
+        glVertex2f(array[1][0], array[1][1]);
+        glVertex2f(array[2][0], array[2][1]);
+        glVertex2f(array[3][0], array[3][1]);
+     glEnd();
+ 
+   glFlush();  
+}
+
+void drawNestedFigure(void)   // Рисование вложенной фигуры
+{
+   glClear(GL_COLOR_BUFFER_BIT);
+   
+   glBegin(GL_QUADS);
+      glColor3f(1.0, 1.0, 1.0);
+      glLineWidth(2);
+      glVertex2f(array[0][0], array[0][1]);  
+      glVertex2f(array[1][0], array[1][1]);
+      glVertex2f(array[2][0], array[2][1]);
+      glVertex2f(array[3][0], array[3][1]);
+   glEnd();
+
+   glBegin(GL_QUADS);
+      glColor3f(0.0, 0.0, 0.0);
+      glLineWidth(2);
+      glVertex2f(array[4][0], array[4][1]);  
+      glVertex2f(array[5][0], array[5][1]);
+      glVertex2f(array[6][0], array[6][1]);
+      glVertex2f(array[7][0], array[7][1]);
+   glEnd();
+
+   glFlush();
+}
+
+int read(const char str[], int ch)   // Считывание данных из файла
+{
+   FILE *f = fopen(str, "r");
+   float x, y;
+   
+   if(f == NULL)
+   {
+      printf("Файл не найден\n");
+      return 0;
+   }
+   else
+   {
+      fscanf(f, "%d", &lineWidth);
+      for(int i = 0; i < 3; i++)
+         fscanf(f, "%f", &color[i]);
+      if(ch != 3)
+         for(int i = 0; i < 4; i++)
+         {
+            fscanf(f, "%f %f", &x, &y);
+            array[i][0] = x;
+            array[i][1] = y;
+         }
+      else 
+         for(int i = 0; i < 8; i++)
+         {
+            fscanf(f, "%f %f", &x, &y);
+            array[i][0] = x;
+            array[i][1] = y;
+         }
+   }
+}
+
+bool correct(float x1Begin, float y1Begin, float x1End, float y1End, float x2Begin, float y2Begin, float x2End, float y2End)   // Проверка является ли фигура трапецией
+{
+   float AB[2];
+   float CD[2];
+
+   AB[0] = x1End - x1Begin;
+   AB[1] = y1End - y1Begin;
+   CD[0] = x2End - x2Begin;
+   CD[1] = y2End - y2Begin;
+
+   float Nab = sqrtf(AB[0] * AB[0] + AB[1] * AB[1]);
+   float Ncd = sqrtf(CD[0] * CD[0] + CD[1] * CD[1]);
+
+   AB[0] = AB[0] / Nab;
+   AB[1] = AB[1] / Nab;
+   CD[0] = CD[0] / Ncd;
+   CD[1] = CD[1] / Ncd;
+
+   if(AB[0] + CD[0] == 0 && AB[1] + CD[1] == 0 || AB[0] - CD[0] == 0 && AB[1] - CD[1] == 0)
+      return true;
+   else 
+      return false;
+}
+
+bool isItNested(float x0, float y0)   // Проверка является ли фигура вложенной в другую
+{
+   float a = (array[0][0] - x0) * (array[1][1] - array[0][1]) - (array[1][0] - array[0][0]) * (array[0][1] - y0);
+   float b = (array[1][0] - x0) * (array[2][1] - array[1][1]) - (array[2][0] - array[1][0]) * (array[1][1] - y0);
+   float c = (array[2][0] - x0) * (array[0][1] - array[2][1]) - (array[0][0] - array[2][0]) * (array[2][1] - y0);
+   float a1 = (array[2][0] - x0) * (array[3][1] - array[2][1]) - (array[3][0] - array[2][0]) * (array[2][1] - y0);
+   float b1 = (array[3][0] - x0) * (array[0][1] - array[3][1]) - (array[0][0] - array[3][0]) * (array[3][1] - y0);
+   float c1 = (array[0][0] - x0) * (array[2][1] - array[0][1]) - (array[2][0] - array[0][0]) * (array[0][1] - y0);
+
+   if((a <= 0 && b <= 0 && c <= 0 || a1 <= 0 && b1 <= 0 && c <= 0) || 
+      (a >= 0 && b >= 0 && c >= 0 || a1 >= 0 && b1 >= 0 && c1 >= 0))
+     return true;
+   else 
+     return false;
+}
+
+int main(int argc, char *argv[])
+{
+   bool unImput = 0;
+   int ch;
+
+   printf("1 - незакрашенная фигура\n2 - закрашенная фигура\n3 - вложенная фигура\n");
+   scanf("%d", &ch);
+
+   switch(ch)
+   {
+      case 1 : read("test1.txt", ch); break;
+      case 2 : read("test2.txt", ch); break;
+      case 3 : read("test3.txt", ch); break;
+      default : unImput = 1; break;
+   }
+
+   if(!unImput)
+   {  
+      if(correct(array[0][0], array[0][1], array[1][0], array[1][1], array[2][0], array[2][1], array[3][0], array[3][1]) &&
+         !correct(array[0][0], array[0][1], array[3][0], array[3][1], array[1][0], array[1][1], array[2][0], array[2][1]) ||
+         correct(array[0][0], array[0][1], array[3][0], array[3][1], array[1][0], array[1][1], array[2][0], array[2][1]) && 
+         !correct(array[0][0], array[0][1], array[1][0], array[1][1], array[2][0], array[2][1], array[3][0], array[3][1]))
+      {
+         if(isItNested(array[4][0], array[4][1]) && isItNested(array[5][0], array[5][1]) &&  
+            isItNested(array[6][0], array[6][1]) && isItNested(array[7][0], array[7][1])|| ch != 3)  
+         {
+            glutInit(&argc, argv);
+            glutInitWindowSize(800, 600);
+            glutInitWindowPosition(100, 50);
+          
+            glutInitDisplayMode(GLUT_RGB);
+            glutCreateWindow("Трапеция");
+       
+            glutReshapeFunc(Reshape);
+            switch(ch)
+            {
+               case 1 : glutDisplayFunc(drawFrame); break;
+               case 2 : glutDisplayFunc(drawArea); break;
+               case 3 : glutDisplayFunc(drawNestedFigure); break;
+            }
+            glClearColor(0, 0, 0, 0);
+       
+            glutMainLoop();
+            return 0;
+         } else printf("Ошибка: фигура не является вложенной\n");
+      } else printf("Ошибка: фигура не является трапецией\n");
+   } else printf("Ошибка: неправильная команда\n");
+}
+
+//#include "trapeze.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <GL/glut.h>
+
+void Trapeze::set_lineWidth(int x)
+{
+   Trapeze::value.lineWidth = x;
+}
+
+int Trapeze::get_lineWidth()
+{
+   return Trapeze::value.lineWidth;
+}
+
+void Trapeze::set_color(int i, float x)
+{
+    Trapeze::value.color[i] = x;
+}
+
+float Trapeze::get_color(int i)
+{
+   return Trapeze::value.color[i];
+}
+
+void Trapeze::set_array(int i, int j, float x)
+{
+   Trapeze::value.array[i][j] = x;
+}
+
+float Trapeze::get_array(int i, int j)
+{
+   return Trapeze::value.array[i][j];
+}
+
+void Trapeze::Reshape(int width, int height)
+{
+  glViewport(0, 0, width, height);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluOrtho2D(-1, 1, -1, 1);
+  glMatrixMode(GL_MODELVIEW);
+}
+
+void Trapeze::drawFrame(void)    // Рисование рамки
+{
+   glClear(GL_COLOR_BUFFER_BIT);
+ 
+   glColor3f(Trapeze::value.color[0], Trapeze::value.color[1], Trapeze::value.color[2]);
+   glLineWidth(Trapeze::value.lineWidth);
+ 
+     glBegin(GL_LINE_LOOP);
+        glVertex2f(Trapeze::value.array[0][0], Trapeze::value.array[0][1]);  
+        glVertex2f(Trapeze::value.array[1][0], Trapeze::value.array[1][1]);
+        glVertex2f(Trapeze::value.array[2][0], Trapeze::value.array[2][1]);
+        glVertex2f(Trapeze::value.array[3][0], Trapeze::value.array[3][1]);
+     glEnd();
+ 
+   glFlush();  
+}
+
+void Trapeze::drawArea(void)   // Рисование закрашенной фигуры
+{
+   glClear(GL_COLOR_BUFFER_BIT);
+ 
+   glColor3f(Trapeze::value.color[0], Trapeze::value.color[1], Trapeze::value.color[2]);
+   glLineWidth(Trapeze::value.lineWidth);
+ 
+     glBegin(GL_QUADS);
+        glVertex2f(Trapeze::value.array[0][0], Trapeze::value.array[0][1]);  
+        glVertex2f(Trapeze::value.array[1][0], Trapeze::value.array[1][1]);
+        glVertex2f(Trapeze::value.array[2][0], Trapeze::value.array[2][1]);
+        glVertex2f(Trapeze::value.array[3][0], Trapeze::value.array[3][1]);
+     glEnd();
+ 
+   glFlush();  
+}
+
+void Trapeze::drawNestedFigure(void)   // Рисование вложенной фигуры
+{
+   glClear(GL_COLOR_BUFFER_BIT);
+   
+   glBegin(GL_QUADS);
+      glColor3f(1.0, 1.0, 1.0);
+      glLineWidth(2);
+      glVertex2f(Trapeze::value.array[0][0], Trapeze::value.array[0][1]);  
+      glVertex2f(Trapeze::value.array[1][0], Trapeze::value.array[1][1]);
+      glVertex2f(Trapeze::value.array[2][0], Trapeze::value.array[2][1]);
+      glVertex2f(Trapeze::value.array[3][0], Trapeze::value.array[3][1]);
+   glEnd();
+
+   glBegin(GL_QUADS);
+      glColor3f(0.0, 0.0, 0.0);
+      glLineWidth(2);
+      glVertex2f(Trapeze::value.array[4][0], Trapeze::value.array[4][1]);  
+      glVertex2f(Trapeze::value.array[5][0], Trapeze::value.array[5][1]);
+      glVertex2f(Trapeze::value.array[6][0], Trapeze::value.array[6][1]);
+      glVertex2f(Trapeze::value.array[7][0], Trapeze::value.array[7][1]);
+   glEnd();
+
+   glFlush();
+}
+
+int Trapeze::read(const char str[], int ch)   // Считывание данных из файла
+{
+   FILE *f = fopen(str, "r");
+   float x, y, color;
+   int lineWidth;
+   
+   if(f == NULL)
+   {
+      printf("Файл не найден\n");
+      return 0;
+   }
+   else
+   {
+      fscanf(f, "%d", &lineWidth);
+      Trapeze::set_lineWidth(lineWidth);
+      for(int i = 0; i < 3; i++)
+      {
+         fscanf(f, "%f", &color);
+         Trapeze::set_color(i, color);
+      }
+      if(ch != 3)
+         for(int i = 0; i < 4; i++)
+         {
+            fscanf(f, "%f %f", &x, &y);
+            Trapeze::set_array(i, 0, x);
+            Trapeze::set_array(i, 1, y);
+         }
+      else 
+         for(int i = 0; i < 8; i++)
+         {
+            fscanf(f, "%f %f", &x, &y);
+            Trapeze::set_array(i, 0, x);
+            Trapeze::set_array(i, 1, y);
+         }
+   }
+}
+
+bool Trapeze::correct(float x1Begin, float y1Begin, float x1End, float y1End, float x2Begin, float y2Begin, float x2End, float y2End)   // Проверка является ли фигура трапецией
+{
+   float AB[2];
+   float CD[2];
+
+   AB[0] = x1End - x1Begin;
+   AB[1] = y1End - y1Begin;
+   CD[0] = x2End - x2Begin;
+   CD[1] = y2End - y2Begin;
+
+   float Nab = sqrtf(AB[0] * AB[0] + AB[1] * AB[1]);
+   float Ncd = sqrtf(CD[0] * CD[0] + CD[1] * CD[1]);
+
+   AB[0] = AB[0] / Nab;
+   AB[1] = AB[1] / Nab;
+   CD[0] = CD[0] / Ncd;
+   CD[1] = CD[1] / Ncd;
+
+   if(AB[0] + CD[0] == 0 && AB[1] + CD[1] == 0 || AB[0] - CD[0] == 0 && AB[1] - CD[1] == 0)
+      return true;
+   else 
+      return false;
+}
+
+bool Trapeze::isItNested(float x0, float y0)   // Проверка является ли фигура вложенной в другую
+{
+   float a = (Trapeze::get_array(0, 0) - x0) * (Trapeze::get_array(1, 1) - Trapeze::get_array(0, 1)) - (Trapeze::get_array(1, 0) - Trapeze::get_array(0, 0)) * (Trapeze::get_array(0, 1) - y0);
+   float b = (Trapeze::get_array(1, 0) - x0) * (Trapeze::get_array(2, 1) - Trapeze::get_array(1, 1)) - (Trapeze::get_array(2, 0) - Trapeze::get_array(1, 0)) * (Trapeze::get_array(1, 1) - y0);
+   float c = (Trapeze::get_array(2, 0) - x0) * (Trapeze::get_array(0, 1) - Trapeze::get_array(2, 1)) - (Trapeze::get_array(0, 0) - Trapeze::get_array(2, 0)) * (Trapeze::get_array(2, 1) - y0);
+   float a1 = (Trapeze::get_array(2, 0) - x0) * (Trapeze::get_array(3, 1) - Trapeze::get_array(2, 1)) - (Trapeze::get_array(3, 0) - Trapeze::get_array(2, 0)) * (Trapeze::get_array(2, 1) - y0);
+   float b1 = (Trapeze::get_array(3, 0) - x0) * (Trapeze::get_array(0, 1) - Trapeze::get_array(3, 1)) - (Trapeze::get_array(0, 0) - Trapeze::get_array(3, 0)) * (Trapeze::get_array(3, 1) - y0);
+   float c1 = (Trapeze::get_array(0, 0) - x0) * (Trapeze::get_array(2, 1) - Trapeze::get_array(0, 1)) - (Trapeze::get_array(2, 0) - Trapeze::get_array(0, 0)) * (Trapeze::get_array(0, 1) - y0);
+
+   if((a <= 0 && b <= 0 && c <= 0 || a1 <= 0 && b1 <= 0 && c <= 0) || 
+      (a >= 0 && b >= 0 && c >= 0 || a1 >= 0 && b1 >= 0 && c1 >= 0))
+     return true;
+   else 
+     return false;
+}
